@@ -1,0 +1,37 @@
+suite: Test env configmap
+
+templates:
+  - env-configmap.yaml
+
+tests:
+  - it: Should contain `MLFLOW_DEFAULT_ARTIFACT_ROOT` if artifact store is enabled and defaultArtifactRoot is specified
+    set:
+      artifactStore:
+        enabled: true
+        defaultArtifactRoot: ./mlruns
+    asserts:
+      - equal:
+          path: data.MLFLOW_DEFAULT_ARTIFACT_ROOT
+          value: ./mlruns
+
+  - it: Should contain `MLFLOW_ARTIFACTS_DESTINATION` if artifact store is enabled and artifactsDestination is specified
+    set:
+      artifactStore:
+        enabled: true
+        artifactsDestination: ./mlartifacts
+    asserts:
+      - equal:
+          path: data.MLFLOW_ARTIFACTS_DESTINATION
+          value: ./mlartifacts
+
+  - it: Should contain `MLFLOW_OSS_ENDPOINT` if use OSS as artifact storage
+    set:
+      artifactStore:
+        enabled: true
+        oss:
+          enabled: true
+          endpoint: oss://example-bucket/mlflow
+    asserts:
+      - equal:
+          path: data.MLFLOW_OSS_ENDPOINT
+          value: oss://example-bucket/mlflow

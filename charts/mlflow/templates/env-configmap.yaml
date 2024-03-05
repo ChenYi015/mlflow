@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlflow.envConfigMapName" . }}
+  labels:
+    {{- include "mlflow.labels" . | nindent 4 }}
+data:
+  {{- if .Values.artifactStore.enabled }}
+
+  {{- if .Values.artifactStore.defaultArtifactRoot }}
+  MLFLOW_DEFAULT_ARTIFACT_ROOT: {{ .Values.artifactStore.defaultArtifactRoot }}
+  {{- end }}
+
+  {{- if .Values.artifactStore.artifactsDestination }}
+  MLFLOW_ARTIFACTS_DESTINATION: {{ .Values.artifactStore.artifactsDestination }}
+  {{- end }}
+
+  {{- if .Values.artifactStore.oss.enabled }}
+  {{- if .Values.artifactStore.oss.endpoint }}
+  MLFLOW_OSS_ENDPOINT: {{ .Values.artifactStore.oss.endpoint }}
+  {{- end }}
+  {{- end }}
+
+  {{- end }}

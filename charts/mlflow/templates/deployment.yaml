@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mlflow.fullname" . }}
+  labels:
+    {{- include "mlflow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mlflow.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mlflow.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+      - name: mlflow
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - mlflow
+        args:
+        - server
+        - --host={{ .Values.trackingServer.host }}
+        - --port={{ .Values.trackingServer.port }}
+        - --workers={{ .Values.trackingServer.workers }}
+        {{- if .Values.trackingServer.enabled }}
+          {{- if .Values.artifactStore.enabled }}
+        - --serve-artifacts
+          {{- else }}
+        - --no-serve-artifacts
+          {{- end }}
+        {{- else }}
+          {{- if .Values.artifactStore.enabled }}
+        - --artifacts-only
+          {{- end }}
+        {{- end }}
+        {{- if .Values.trackingServer.basicAuth.enabled }}
+        - --app-name=mlflow.server:app
+        {{- end }}
+        {{- with .Values.trackingServer.extraArgs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - containerPort: {{ .Values.trackingServer.port }}
+          name: http
+        {{- with .Values.extraEnv }}
+        env:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        envFrom:
+        {{- if .Values.backendStore.existingSecret }}
+        - secretRef:
+            name: {{ .Values.backendStore.existingSecret }} 
+        {{- end }}
+        - configMapRef:
+            name: {{ include "mlflow.envConfigMapName" . }}
+        - secretRef:
+            name: {{ include "mlflow.envSecretName" . }}
+        {{- with .Values.extraEnvFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if and .Values.artifactStore.s3.enabled .Values.artifactStore.s3.existingSecret }}
+        - secretRef:
+            name: {{ .Values.artifactStore.s3.existingSecret }} 
+        {{- end }}
+        {{- if and .Values.artifactStore.gcp.enabled .Values.artifactStore.gcp.existingSecret }}
+        - secretRef:
+            name: {{ .Values.artifactStore.gcp.existingSecret }}
+        {{- end }}
+        {{- if and .Values.artifactStore.azure.enabled .Values.artifactStore.azure.existingSecret }}
+        - secretRef:
+            name: {{ .Values.artifactStore.azure.existingSecret}}
+        {{- end }}
+        {{- if and .Values.artifactStore.oss.enabled .Values.artifactStore.oss.existingSecret }}
+        - secretRef:
+            name: {{ .Values.artifactStore.oss.existingSecret }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.trackingServer.basicAuth.enabled }}
+        - name: basic-auth-volume
+          mountPath: /etc/mlflow
+          readOnly: true
+        {{- end }}
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            port: http
+            path: /
+        readinessProbe:
+          httpGet:
+            port: http
+            path: /
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+      {{- if .Values.trackingServer.basicAuth.enabled }}
+      - name: basic-auth-volume
+        secret:
+          {{- if .Values.trackingServer.basicAuth.existingSecret }}
+          secretName: {{ .Values.trackingServer.basicAuth.existingSecret }}
+          {{- else }}
+          secretName: {{ include "mlflow.basicAuthSecretName" . }}
+          {{- end }}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mlflow.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,351 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.deprecationWarning" . }}
+
+![mlflow](https://raw.githubusercontent.com/mlflow/mlflow/master/docs/source/_static/MLflow-logo-final-black.png)
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+## Prerequisites
+
+- Kubernetes >= 1.19
+- Helm >= 3.2.0
+
+## How To Use
+
+### Installing the Chart
+
+To install the chart with release name `my-release`:
+
+```bash
+helm install my-release mlflow/mlflow
+```
+
+### Upgrading the Chart
+
+To upgrade the chart with release name `my-release`:
+
+```bash
+helm upgrade my-release mlflow/mlflow
+```
+
+### Uninstalling the chart
+
+To uninstall the chart with release name `my-release`:
+
+```bash
+helm uninstall my-release
+```
+
+## Configurations
+
+### Backend Store
+
+For more information, please visit [Supported Backend Store Types](https://mlflow.org/docs/latest/tracking/backend-stores.html#supported-store-types).
+
+#### Use Database as Backend Store
+
+Database can be configured as backend store in the following two ways:
+
+1. Create a secret to store database connection url and refer it in `valus.yaml`.
+2. Configure backend store url in `values.yaml` and a new secret will be created to store it.
+
+First, create a secret to store database connection url. The following command create a secret with name `mlflow-database-backend-store-secret`:
+
+```bash
+kubectl create secret generic mlflow-database-backend-store-secret \
+    --from-literal=BACKEND_STORE_URL=<dialect>+<driver>://<username>:<password>@<host>:<port>/<database>
+```
+
+For more details, please visit [SQLAlchemy Database URL](https://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls).
+
+Then configure `values.yaml` as following:
+
+```yaml
+backendStore:
+  existingSecret: mlflow-mysql-backend-store-secret
+```
+
+Otherwise, if no existing secret is specified and `backendStore.createSecret.backendStoreUri` is given, then creates a secret to store it:
+
+```yaml
+backendStore:
+  createSecret:
+    backendStoreUri: <dialect>+<driver>://<username>:<password>@<host>:<port>/<database>
+```
+
+### Artifact Store
+
+Supported storage types for the artifact store are:
+
+- Amazon S3 and S3-compatible storage e.g. `s3://<bucket>/<path>`
+- Azure Blob Storage e.g. `wasbs://<container>@<storage-account>.blob.core.windows.net/<path>`
+- Google Cloud Storage e.g. `gs://<bucket>/<path>`
+- Alibaba Cloud OSS e.g. `oss://<bucket>/<path>`
+- FTP server e.g. `ftp://user:pass@host/path/to/directory`
+- SFTP Server e.g. `sftp://user@host/path/to/directory`
+- NFS e.g. `/mnt/nfs`
+- HDFS e.g. `hdfs://<host>:<port>/<path>`
+
+#### Configure Default Artifact Root
+
+The following configuration enables artifact store and set default artifact root as `./mlruns`:
+
+```yaml
+artifactStore:
+  enabled: true
+  defaultArtifactRoot: ./mlruns
+```
+
+#### Use AWS S3 for Artifact Store
+
+There are two different ways to connect to S3:
+
+1. Access S3 with AWS IAM role ARN by adding annotations to the service account.
+2. Access S3 with AWS IAM user's `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
+##### Use AWS IAM Role ARN
+
+Associate an AWS IAM role to the service account by adding annotations as follows:
+
+```yaml
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::account-id:role/<YOUR_IAM_ROLE_ARN>"
+```
+
+For detailed information, please visit [Configuring a Kubernetes service account to assume an IAM role - Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html).
+
+##### Use AWS Access Key
+
+Create a secret to store S3 access credentials:
+
+```bash
+kubectl create secret generic mlflow-s3-artifact-store-secret \
+    --from-literal=AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID> \
+    --from-literal=AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
+```
+
+Then you can configure `values.yaml` as following:
+
+```yaml
+artifactStore:
+  enabled: true
+  s3:
+    enabled: true
+    existingSecret: mlflow-s3-artifact-store-secret
+```
+
+Otherwise, if no existing credentials secret is specified, it will create a secret for you used to connect to S3:
+
+```yaml
+artifactStore:
+  enabled: true
+  defaultArtifactStore: s3://<bucket>/<path>
+  s3:
+    enabled: true
+    createSecret:
+      accessKeyId: <YOUR_AWS_ACCESS_KEY_ID>
+      secretAccessKey: <YOUR_AWS_SECRET_ACCESS_KEY>
+```
+
+##### Extra Configurations
+
+To add S3 file upload extra arguments, you need to set `MLFLOW_S3_UPLOAD_EXTRA_ARGS` to a JSON object of key/value pairs. For example, if you want to upload to a KMS Encrypted bucket using the KMS Key 1234:
+
+```yaml
+extraEnv:
+- name: MLFLOW_S3_UPLOAD_EXTRA_ARGS
+  value: |
+    {"ServerSideEncryption": "aws:kms", "SSEKMSKeyId": "1234"}
+```
+
+To store artifacts in a custom S3 endpoint, you need to set `MLFLOW_S3_ENDPOINT_URL` environment variable as follows:
+
+```yaml
+extraEnv:
+- name: MLFLOW_S3_ENDPOINT
+  value: <YOUR_S3_ENDPOINT_URL>
+```
+
+If you want to disable TLS authentication, you can set `MLFLOW_S3_IGNORE_TLS` variable to `true`:
+
+```yaml
+extraEnv:
+- name: MLFLOW_S3_IGNORE_TLS
+  value: true
+```
+
+Additionally, if MinIO server is configured with non-default region, you should set `AWS_DEFAULT_REGION` variable:
+
+```yaml
+extraEnv:
+- name: AWS_DEFAULT_REGION
+  value: <YOUR_REGION>
+```
+
+#### Use Azure Blob Storage for Artifact Store
+
+Create a secret to store Azure access credentials:
+
+```yaml
+kubectl create secret generic mlflow-azure-artifact-store-secret \
+    --from-literal=AZURE_STORAGE_CONNECTION_STRING=<AZURE_STORAGE_CONNECTION_STRING> \
+    --from-literal=AZURE_STORAGE_ACCESS_KEY=<YOUR_AZURE_STORAGE_ACCESS_KEY>
+```
+
+Then configure Azure artifact store to use the secret just created:
+
+```yaml
+artifactStore:
+  enabled: true
+  azure:
+    enabled: true
+    existingSecret: mlflow-azure-artifact-store-secret
+```
+
+#### Use Google Cloud Storage for Artifact Store
+
+Create a secret to store GCP access credentials:
+
+```yaml
+kubectl create secret generic mlflow-gcp-artifact-store-secret \
+    --from-literal=keyfile.json=<YOUR_KEYFILE_CONTENT>
+```
+
+```yaml
+artifactStore:
+  enabled: true
+  defaultArtifactRoot: gs://<bucket>/<path>
+  gcp:
+    enabled: true
+    existingSecret: mlflow-gcp-artifact-store-secret
+```
+
+You may set some MLflow environment variables to troubleshoot GCS read-timeouts by setting the following variables:
+
+```yaml
+extraEnv:
+# Sets the standard timeout for transfer operations in seconds (Default: 60 for GCS). Use -1 for indefinite timeout.
+- name: MLFLOW_ARTIFACT_UPLOAD_DOWNLOAD_TIMEOUT
+  value: 60
+# Sets the standard upload chunk size for bigger files in bytes (Default: 104857600 ≙ 100MiB), must be multiple of 256 KB.
+- name: MLFLOW_GCS_UPLOAD_CHUNK_SIZE
+  value: 104857600
+# Sets the standard download chunk size for bigger files in bytes (Default: 104857600 ≙ 100MiB), must be multiple of 256 KB.
+- name: MLFLOW_GCS_DOWNLOAD_CHUNK_SIZE
+  value: 104857600
+```
+
+#### Use Alibaba Cloud OSS for Artifact Store
+
+There are two different ways to access OSS:
+
+1. Associates an Alibaba Cloud RAM role to the service account **(Recommended)**.
+2. Use Alibaba Cloud RAM user's AccessKey ID and AccessKey Secret.
+
+##### Use Alibaba Cloud RAM Role
+
+Associate an Alibaba Cloud RAM role to the service account by adding annotations as follows:
+
+```yaml
+serviceAccount:
+  create: true
+  annotations:
+    pod-identity.alibabacloud.com/role-name: <YOUR_ALIBABA_CLOUD_RAM_ROLE_NAME>
+```
+
+For more information, please visit [Use RRSA to authorize different pods to access different cloud services - Container Service for Kubernetes - Alibaba Cloud Documentation Center](https://www.alibabacloud.com/help/ack/ack-managed-and-ack-dedicated/user-guide/use-rrsa-to-authorize-pods-to-access-different-cloud-services).
+
+##### Use Alibaba Cloud AccessKey
+
+Create a secret to store Alibaba Cloud AccessKey ID and AccessKey Secret as follows:
+
+```bash
+kubectl create secret generic mlflow-oss-artifact-store-secret \
+    --from-literal=MLFLOW_OSS_KEY_ID=<ALIBABA_CLOUD_ACCESS_KEY_ID> \
+    --from-literal=MLFLOW_OSS_KEY_SECRET=<ALIBABA_CLOUD_ACCESS_KEY_SECRET>
+```
+
+Then configure OSS artifact store to use the secret just created:
+
+```yaml
+artifactStore:
+  enabled: true
+  defaultArtifactRoot: oss://<bucket>/<path>
+  oss:
+    enabled: true
+    existingSecret: mlflow-oss-artifact-store-secret
+```
+
+Otherwise, if no existing secret is specified, you can fill your access credentials as follows and a new secret will be created to store it:
+
+```yaml
+artifactStore:
+  enabled: true
+  defaultArtifactRoot: oss://<bucket>/<path>
+  oss:
+    enabled: true
+    createSecret:
+      accessKeyId: <YOUR_ALIBABA_CLOUD_ACCESS_KEY_ID>
+      accessKeySecret: <YOUR_ALIBABA_CLOUD_ACCESS_KEY_SECRET>
+```
+
+### Authentication
+
+### Use BasicAuth
+
+MLflow supports basic HTTP authentication to enable access control over experiments and registered models.
+
+Suppose you have `basic_auth.ini` file as follows:
+
+```ini
+[mlflow]
+default_permission = READ
+database_uri = sqlite:///basic_auth.db
+admin_username = admin
+admin_password = password
+authorization_function = mlflow.server.auth:authenticate_request_basic_auth
+```
+
+Create a secret to store basic auth configurations from configuration file:
+
+```bash
+kubectl create secret generic mlflow-basic-auth-secret --from-file=basic_auth.ini
+```
+
+Then enable BasicAuth and use the secret just created:
+
+```yaml
+trackingServer:
+  enabled: true
+  basicAuth:
+    enabled: true
+    existingSecret: mlflow-basic-auth-secret
+```
+
+Otherwise, you can directly configure basic authentication as follows:
+
+```yaml
+trackingServer:
+  enabled: true
+  basicAuth:
+    enabled: true
+    createSecret:
+      defaultPermission: READ
+      databaseUri: sqlite:///basic_auth.db
+      adminUsername: admin
+      adminPassword: password
+      authorizationFunction: mlflow.server.auth:authenticate_request_basic_auth
+```
+
+{{ template "chart.valuesSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.maintainersSection" . }}
