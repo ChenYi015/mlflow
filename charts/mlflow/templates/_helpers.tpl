@@ -81,3 +81,10 @@ Create the name of configmap used to store environment variables.
 {{- define "mlflow.envConfigMapName" -}}
 {{ include "mlflow.fullname" . }}-env-configmap
 {{- end -}}
+
+{{/*
+Create the name of MLflow iamge.
+*/}}
+{{- define "mlflow.image" -}}
+{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default (printf "v%s" .Chart.AppVersion) }}
+{{- end -}}

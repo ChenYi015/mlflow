@@ -5,20 +5,11 @@ metadata:
   labels:
     {{- include "mlflow.labels" . | nindent 4 }}
 data:
-  {{- if .Values.artifactStore.enabled }}
-
-  {{- if .Values.artifactStore.defaultArtifactRoot }}
-  MLFLOW_DEFAULT_ARTIFACT_ROOT: {{ .Values.artifactStore.defaultArtifactRoot }}
-  {{- end }}
-
-  {{- if .Values.artifactStore.artifactsDestination }}
-  MLFLOW_ARTIFACTS_DESTINATION: {{ .Values.artifactStore.artifactsDestination }}
-  {{- end }}
-
+  {{- /* Use Alibaba Cloud OSS as artifact store */}}
   {{- if .Values.artifactStore.oss.enabled }}
-  {{- if .Values.artifactStore.oss.endpoint }}
-  MLFLOW_OSS_ENDPOINT: {{ .Values.artifactStore.oss.endpoint }}
+  {{- with .Values.artifactStore.oss.endpoint }}
+  MLFLOW_OSS_ENDPOINT_URL: {{ . }}
+  {{- else }}
+  {{ fail "artifactStore.oss.endpoint must be specified when use OSS as artifact store" }}
   {{- end }}
-  {{- end }}
-
   {{- end }}

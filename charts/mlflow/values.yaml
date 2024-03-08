@@ -22,15 +22,18 @@ image:
   # - name: <secret-name>
 
 trackingServer:
-  # -- Specifies whether to enable tracking server
-  enabled: true
+  # -- Specifies which mode mlflow tracking server run with, available options are `serve-artifacts`, `no-serve-artifacts` and `artifacts-only`
+  mode: no-serve-artifacts
+  # -- Specifies a default artifact location for logging, data will be logged to `mlflow-artifacts/:` if artifact serving is enabled, otherwise `./mlruns`
+  defaultArtifactRoot: ""
+  # -- Specifies the base artifact location from which to resolve artifact upload/download/list requests (e.g. `s3://my-bucket`)
+  artifactsDestination: ""
   # -- Network address to listen on
   host: 0.0.0.0
   # -- Port to expose the tracking server
   port: 5000
   # -- Number of gunicorn worker processes to handle requests
   workers: 1
-
   # -- Extra arguments passed to the `mlflow server` command
   extraArgs: []
   # A prefix which will be prepended to the path of all static paths
@@ -41,16 +44,15 @@ trackingServer:
   # - --waitress-opts TEXT
   # Path to the directory where metrics will be stored
   # - --expose-prometheus /metrics
-  # Application name to be used for the tracking server.
-  # If not specified, 'mlflow.server:app' will be used.
-  # - --app-name [basic-auth]
+  # If enabled, run the server with debug logging and auto-reload
+  # - --dev
 
   # Basic authentication configuration,
   # for more information, please visit https://mlflow.org/docs/latest/auth/index.html#configuration
   basicAuth:
     # -- Specifies whether to enable basic authentication
     enabled: false
-    # -- Name of an existing secret which contains key `default_permission`, `database_uri`, `admin_username`, `admin_password` and `authorization_function`
+    # -- Name of an existing secret which contains key `basic_auth.ini`
     existingSecret: ""
     # If enables BasicAuth and no existing secret is specified, creates a secret to store authentication configurations
     createSecret:
@@ -65,28 +67,20 @@ trackingServer:
       # -- Function to authenticate requests
       authorizationFunction: mlflow.server.auth:authenticate_request_basic_auth
 
-# Configure MLflow backend store,
-# for more information, please visit https://mlflow.org/docs/latest/tracking/backend-stores.html
+# For more information about how to configure backend store, please visit https://mlflow.org/docs/latest/tracking/backend-stores.html
 backendStore:
-  # -- Name of an existing secret which contains key `BACKEND_STORE_URI`
+  # -- Specifies whether to run `mlflow db upgrade ${MLFLOW_BACKEND_STORE_URI}` to upgrade database schema when use a database as backend store
+  databaseUpgrade: false
+
+  # -- Name of an existing secret which contains key `MLFLOW_BACKEND_STORE_URI`
   existingSecret: ""
   # -- If no existing secret is specified, creates a secret to store backend store uri
   createSecret:
     # -- Backend store uri
     backendStoreUri: ""
 
-# Configure MLflow artifact store,
-# for more information, please visit https://mlflow.org/docs/latest/tracking.html#artifact-stores
+# For more information about how to configure artifact store, please visit https://mlflow.org/docs/latest/tracking.html#artifact-stores
 artifactStore:
-  # -- Specifies whether to enable serving of artifact uploads, downloads, and list requests by routing these requests to the artifact storage service
-  enabled: true
-
-  # -- Specifies a default artifact location for logging, default as local `./mlruns` directory
-  defaultArtifactRoot: ""
-
-  # -- Specifies the base artifact location from which to resolve artifact upload/download/list requests (e.g. `s3://my-bucket`)
-  artifactsDestination: ""
-
   s3:
     # -- Specifies whether to enable AWS S3 as artifact store backend
     enabled: false
@@ -122,7 +116,9 @@ artifactStore:
     existingSecret: ""
     # -- If Azure is enabled as artifact store backend and no existing secret is specified, create the secret used to connect to Azure
     createSecret:
+      # Azure storage connection string
       azureStorageConnectionString: ""
+      # Azure storage access key
       azureStorageAccessKey: ""
 
   oss:
